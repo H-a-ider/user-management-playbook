@@ -1,0 +1,56 @@
+---
+- name: User Management Playbook
+  hosts: servers
+  become: yes
+
+  vars_prompt:
+    - name: user_state
+      prompt: "Enter user state (present/absent): "
+      private: no
+
+  tasks:
+    - name: Create User Account
+      user:
+        name: "{{ user_name }}"
+        state: "{{ user_state }}"
+        groups: "{{ user_groups }}"
+        password: "{{ user_password | password_hash('sha512') }}"
+      when: user_state == 'present'
+
+    - name: Manage SSH Key
+      authorized_key:
+        user: "{{ user_name }}"
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        state: "{{ ssh_key_state }}"
+      when: user_state == 'present'
+
+    - name: Manage Permissions
+      file:
+        path: "{{ user_home_directory }}"
+        owner: "{{ user_name }}"
+        group: "{{ user_name }}"
+        mode: "{{ user_permissions }}"
+        state: "{{ 'directory' if user_state == 'present' else 'absent' }}"
+      when: user_state == 'present' or user_state == 'absent'
+
+    - name: Remove SSH Key
+      authorized_key:
+        user: "{{ user_name }}"
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        state: absent
+      when: user_state == 'absent'
+
+    - name: Remove User
+      user:
+        name: "{{ user_name }}"
+        state: "absent"
+      when: user_state == 'absent'
+
+  vars:
+    user_name: "ahmad"
+    user_groups: "users"
+    user_password: "123"
+    ssh_key_state: "present"
+    user_home_directory: "/home/ahmad"
+    user_permissions: "700"
+...
